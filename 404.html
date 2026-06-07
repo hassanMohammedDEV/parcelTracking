@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>تتبع الشحنة</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            color: #1a1a2e;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 24px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 50%, rgba(83,127,231,.12) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 50%, rgba(83,216,231,.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+        .header h1 {
+            color: #fff;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: .5px;
+        }
+        .header h1 span {
+            color: #53d8e7;
+        }
+        .header p {
+            color: rgba(255,255,255,.7);
+            font-size: 14px;
+            margin-top: 6px;
+        }
+
+        /* ── Container ── */
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 28px 16px 60px;
+        }
+
+        /* ── Search Box ── */
+        .search-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.06);
+            margin-bottom: 24px;
+        }
+        .search-box label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a4a6a;
+            margin-bottom: 8px;
+        }
+        .search-row {
+            display: flex;
+            gap: 10px;
+        }
+        .search-row input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e4ea;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Cairo', sans-serif;
+            transition: border-color .2s;
+            outline: none;
+            direction: ltr;
+            text-align: left;
+        }
+        .search-row input:focus {
+            border-color: #0f3460;
+        }
+        .search-row input::placeholder {
+            color: #b0b3c5;
+        }
+        .search-row button {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #0f3460, #1a1a2e);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            transition: transform .15s, box-shadow .2s;
+            white-space: nowrap;
+        }
+        .search-row button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(15,52,96,.35);
+        }
+        .search-row button:active {
+            transform: translateY(0);
+        }
+        .search-row button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── States ── */
+        .state {
+            display: none;
+        }
+        .state.active {
+            display: block;
+        }
+
+        /* ── Loading ── */
+        .loading-state {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e4ea;
+            border-top-color: #0f3460;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-state p {
+            color: #6b6b8a;
+            font-size: 15px;
+        }
+
+        /* ── Error ── */
+        .error-state {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 20px;
+            text-align: center;
+            box-shadow: 0 4px 24px rgba(0,0,0,.06);
+        }
+        .error-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #ffe8e8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+        .error-state h2 {
+            font-size: 20px;
+            color: #d32f2f;
+            margin-bottom: 6px;
+        }
+        .error-state p {
+            color: #6b6b8a;
+            font-size: 14px;
+        }
+
+        /* ── Parcel Card ── */
+        .parcel-card {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,.06);
+        }
+        .parcel-card .card-header {
+            background: linear-gradient(135deg, #0f3460, #1a1a2e);
+            padding: 20px 24px;
+            color: #fff;
+        }
+        .parcel-card .card-header .tracking-label {
+            font-size: 12px;
+            opacity: .7;
+            font-weight: 500;
+        }
+        .parcel-card .card-header .tracking-number {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            direction: ltr;
+            text-align: left;
+            margin-top: 2px;
+        }
+        .parcel-card .card-header .status-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            background: rgba(255,255,255,.15);
+            backdrop-filter: blur(4px);
+        }
+
+        .parcel-card .card-body {
+            padding: 20px 24px 24px;
+        }
+
+        /* ── Info Grid ── */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            background: #f8f9fc;
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .info-item.full-width {
+            grid-column: 1 / -1;
+        }
+        .info-item .label {
+            font-size: 12px;
+            color: #8e8ea8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-bottom: 4px;
+        }
+        .info-item .value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a2e;
+            word-break: break-word;
+        }
+        .info-item .value.muted {
+            color: #8e8ea8;
+            font-weight: 500;
+        }
+
+        /* ── Timeline ── */
+        .timeline {
+            margin-top: 8px;
+            position: relative;
+            padding-right: 0;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            right: 11px;
+            top: 12px;
+            bottom: 12px;
+            width: 2.5px;
+            background: #e2e4ea;
+            border-radius: 2px;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding-bottom: 20px;
+            position: relative;
+        }
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+        .timeline-item .dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        .timeline-item .dot.done {
+            background: #22c55e;
+            color: #fff;
+        }
+        .timeline-item .dot.current {
+            background: #0f3460;
+            color: #fff;
+            box-shadow: 0 0 0 4px rgba(15,52,96,.18);
+        }
+        .timeline-item .dot.pending {
+            background: #e2e4ea;
+            color: #8e8ea8;
+        }
+        .timeline-item .tl-content {
+            flex: 1;
+        }
+        .timeline-item .tl-content .tl-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+        .timeline-item .tl-content .tl-date {
+            font-size: 12px;
+            color: #8e8ea8;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 16px;
+            color: #8e8ea8;
+            font-size: 13px;
+        }
+
+        /* ── Responsive: Mobile (< 480px) ── */
+        @media (max-width: 479px) {
+            .header { padding: 18px 16px; }
+            .header h1 { font-size: 20px; }
+            .header p { font-size: 12px; }
+            .container { padding: 16px 12px 40px; }
+            .search-box { padding: 14px; border-radius: 12px; }
+            .search-row { flex-direction: column; }
+            .search-row button { width: 100%; padding: 12px; font-size: 14px; }
+            .search-row input { padding: 10px 14px; font-size: 14px; }
+            .info-grid { grid-template-columns: 1fr; gap: 10px; }
+            .info-item { padding: 10px 12px; }
+            .info-item .value { font-size: 14px; }
+            .parcel-card { border-radius: 12px; }
+            .parcel-card .card-header { padding: 16px; }
+            .parcel-card .card-header .tracking-number { font-size: 16px; word-break: break-all; letter-spacing: .5px; }
+            .parcel-card .card-body { padding: 14px 16px 18px; }
+            .error-state { padding: 24px 16px; }
+            .error-state h2 { font-size: 17px; }
+            .timeline-item { gap: 12px; padding-bottom: 14px; }
+            .timeline-item .dot { width: 20px; height: 20px; font-size: 10px; }
+            .timeline-item .tl-content .tl-title { font-size: 13px; }
+            .timeline::before { right: 9px; }
+            .loading-state { padding: 28px 0; }
+            .spinner { width: 36px; height: 36px; border-width: 3px; }
+        }
+
+        /* ── Responsive: Tablet small (480 – 767px) ── */
+        @media (min-width: 480px) and (max-width: 767px) {
+            .header { padding: 22px 20px; }
+            .header h1 { font-size: 24px; }
+            .container { max-width: 540px; padding: 24px 16px 50px; }
+            .search-box { padding: 18px; }
+            .info-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .info-item { padding: 12px 14px; }
+            .info-item .value { font-size: 15px; }
+            .parcel-card .card-header { padding: 18px 20px; }
+            .parcel-card .card-header .tracking-number { font-size: 19px; }
+            .parcel-card .card-body { padding: 18px 20px 22px; }
+            .timeline-item .dot { width: 22px; height: 22px; font-size: 11px; }
+        }
+
+        /* ── Responsive: Tablet / small laptop (768 – 1023px) ── */
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .container { max-width: 600px; }
+            .header h1 { font-size: 26px; }
+            .parcel-card .card-header .tracking-number { font-size: 20px; }
+        }
+
+        /* ── Responsive: Desktop (≥ 1024px) ── */
+        @media (min-width: 1024px) {
+            .container { max-width: 720px; padding: 40px 24px 80px; }
+            .header { padding: 32px 24px; }
+            .header h1 { font-size: 32px; }
+            .search-box { padding: 24px; border-radius: 20px; margin-bottom: 32px; }
+            .search-box label { font-size: 15px; }
+            .search-row input { padding: 14px 20px; font-size: 16px; }
+            .search-row button { padding: 14px 36px; font-size: 16px; }
+            .parcel-card { border-radius: 20px; }
+            .parcel-card .card-header { padding: 24px 28px; }
+            .parcel-card .card-header .tracking-number { font-size: 24px; }
+            .parcel-card .card-body { padding: 24px 28px 28px; }
+            .info-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+            .info-item { padding: 16px 20px; border-radius: 14px; }
+            .info-item .value { font-size: 17px; }
+            .parcel-card .card-header .status-badge { font-size: 14px; padding: 6px 20px; }
+            .timeline-item { gap: 18px; padding-bottom: 24px; }
+            .timeline-item .dot { width: 26px; height: 26px; font-size: 13px; }
+            .timeline-item .tl-content .tl-title { font-size: 16px; }
+            .timeline::before { right: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1>شحنتي <span>|</span> تتبع</h1>
+            <p>تابع شحنتك بكل سهولة وفي أي وقت</p>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <div class="container">
+
+        <!-- Search -->
+        <div class="search-box" id="searchBox">
+            <label for="trackingInput">رقم التتبع</label>
+            <div class="search-row">
+                <input
+                    id="trackingInput"
+                    type="text"
+                    placeholder="أدخل رقم التتبع..."
+                    autocomplete="off"
+                />
+                <button id="searchBtn">بحث</button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingState" class="state loading-state">
+            <div class="spinner"></div>
+            <p>جاري البحث عن الشحنة ...</p>
+        </div>
+
+        <!-- Error -->
+        <div id="errorState" class="state error-state">
+            <div class="error-icon">⚠️</div>
+            <h2 id="errorTitle">لم نتمكن من العثور على الشحنة</h2>
+            <p id="errorMessage">يرجى التحقق من رقم التتبع والمحاولة مرة أخرى</p>
+        </div>
+
+        <!-- Parcel Details -->
+        <div id="parcelState" class="state">
+            <div class="parcel-card">
+                <div class="card-header">
+                    <div class="tracking-label">رقم التتبع</div>
+                    <div class="tracking-number" id="trackingNumber">---</div>
+                    <div class="status-badge" id="statusBadge">---</div>
+                </div>
+                <div class="card-body">
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="label">اسم الشحنة</div>
+                            <div class="value" id="parcelName">---</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">المبلغ</div>
+                            <div class="value" id="parcelAmount">---</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">تم الإرسال من</div>
+                            <div class="value" id="parcelCity">---</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="label">تم الإرسال إلى</div>
+                            <div class="value" id="parcelOffice">---</div>
+                        </div>
+                        <div class="info-item full-width" id="descRow" style="display:none">
+                            <div class="label">الوصف</div>
+                            <div class="value muted" id="parcelDesc">---</div>
+                        </div>
+                        <div class="info-item full-width" id="notesRow" style="display:none">
+                            <div class="label">ملاحظات</div>
+                            <div class="value muted" id="parcelNotes">---</div>
+                        </div>
+                        <div class="info-item full-width">
+                            <div class="label">تاريخ الإنشاء</div>
+                            <div class="value muted" id="parcelDate">---</div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline -->
+                    <div style="margin-top: 8px;">
+                        <div style="font-size:13px;font-weight:700;color:#4a4a6a;margin-bottom:12px;">حالة الشحنة</div>
+                        <div class="timeline" id="timeline"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        جميع الحقوق محفوظة &copy; 2026
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const SUPABASE_URL    = 'https://kdobnpdnzjfmopuhckep.supabase.co';
+            const SUPABASE_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtkb2JucGRuempmbW9wdWhja2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjQ1NDQsImV4cCI6MjA5NjMwMDU0NH0.ke4q-v57mdsHw6t_OP6oSCMk0AneFxLwOPpxMUttyKw';
+            const RPC_NAME        = 'get_parcel_by_tracking';
+
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+            // DOM refs
+            const $ = (id) => document.getElementById(id);
+            const trackingInput   = $('trackingInput');
+            const searchBtn       = $('searchBtn');
+            const searchBox       = $('searchBox');
+            const loadingState    = $('loadingState');
+            const errorState      = $('errorState');
+            const errorTitle      = $('errorTitle');
+            const errorMessage    = $('errorMessage');
+            const parcelState     = $('parcelState');
+            const trackingNumber  = $('trackingNumber');
+            const statusBadge     = $('statusBadge');
+            const parcelName      = $('parcelName');
+            const parcelAmount    = $('parcelAmount');
+            const parcelCity      = $('parcelCity');
+            const parcelOffice    = $('parcelOffice');
+            const descRow         = $('descRow');
+            const parcelDesc      = $('parcelDesc');
+            const notesRow        = $('notesRow');
+            const parcelNotes     = $('parcelNotes');
+            const parcelDate      = $('parcelDate');
+            const timelineEl      = $('timeline');
+
+            // Status mapping – integer keys match ParcelStatus enum
+            const STATUS_MAP = {
+                0: { label: 'التجهيز للشحن',  color: '#ea580c' },
+                1: { label: 'قيد التوصيل',   color: '#1d4ed8' },
+                2: { label: 'تم التوصيل',    color: '#0f766e' },
+                3: { label: 'تم التسليم',    color: '#15803d' },
+            };
+            const DEFAULT_STATUS = { label: 'غير محدد', color: '#8e8ea8' };
+
+            function getStatusInfo(status) {
+                return STATUS_MAP[status] ?? DEFAULT_STATUS;
+            }
+
+            function showState(state) {
+                [loadingState, errorState, parcelState].forEach(el => el.classList.remove('active'));
+                state.classList.add('active');
+            }
+
+            function formatDate(iso) {
+                if (!iso) return '---';
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleDateString('ar-SA', {
+                        year: 'numeric', month: 'long', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                } catch { return iso; }
+            }
+
+            function formatAmount(amount) {
+                if (amount == null || amount === '') return '---';
+                const num = Number(amount);
+                return isNaN(num) ? amount : num.toLocaleString('ar-SA') + ' ر.س';
+            }
+
+            function buildTimeline(status, createdAt) {
+                const steps = [
+                    'قيد الانتظار',
+                    'قيد التوصيل',
+                    'تم التوصيل',
+                    'تم التسليم',
+                ];
+
+                const currentIdx = Number(status);
+                if (isNaN(currentIdx) || currentIdx < 0 || currentIdx > 3) return '';
+
+                return steps.map((label, i) => {
+                    let cls = 'pending';
+                    let icon = '○';
+                    if (currentIdx > i)  { cls = 'done';    icon = '✓'; }
+                    else if (currentIdx === i) { cls = 'current'; icon = '●'; }
+
+                    const dateHtml = (currentIdx === i && createdAt)
+                        ? `<div class="tl-date">${formatDate(createdAt)}</div>`
+                        : '';
+
+                    return `
+                        <div class="timeline-item">
+                            <div class="dot ${cls}">${icon}</div>
+                            <div class="tl-content">
+                                <div class="tl-title">${label}</div>
+                                ${dateHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function displayParcel(data) {
+                trackingNumber.textContent = data.tracking_number || '---';
+                parcelName.textContent     = data.parcel_name || '---';
+                parcelAmount.textContent   = formatAmount(data.amount);
+                parcelCity.textContent     = data.city_name || '---';
+                parcelOffice.textContent   = data.office_name || '---';
+
+                if (data.description) {
+                    descRow.style.display = 'block';
+                    parcelDesc.textContent = data.description;
+                } else {
+                    descRow.style.display = 'none';
+                }
+
+                if (data.notes) {
+                    notesRow.style.display = 'block';
+                    parcelNotes.textContent = data.notes;
+                } else {
+                    notesRow.style.display = 'none';
+                }
+
+                parcelDate.textContent = formatDate(data.created_at);
+
+                // Status badge
+                const statusInfo = getStatusInfo(data.status);
+                statusBadge.textContent = statusInfo.label;
+                statusBadge.style.background = statusInfo.color + '33';
+                statusBadge.style.color = statusInfo.color;
+
+                // Timeline
+                timelineEl.innerHTML = buildTimeline(data.status, data.created_at);
+            }
+
+            async function fetchParcel(tracking) {
+                const trimmed = tracking.trim();
+                if (!trimmed) {
+                    showState(errorState);
+                    errorTitle.textContent   = 'حقل فارغ';
+                    errorMessage.textContent = 'يرجى إدخال رقم التتبع الخاص بالطرد';
+                    return;
+                }
+
+                showState(loadingState);
+
+                try {
+                    const { data, error } = await supabase.rpc(RPC_NAME, {
+                        p_tracking_number: trimmed,
+                    });
+
+                    if (error) {
+                        showState(errorState);
+                        errorTitle.textContent   = 'خطأ في الاتصال';
+                        errorMessage.textContent = error.message || 'حدث خطأ غير متوقع';
+                        return;
+                    }
+
+                    const code    = data?.code;
+                    const message = data?.message;
+                    const parcel  = data?.data;
+
+                    if (code === 200 && parcel) {
+                        displayParcel(parcel);
+                        showState(parcelState);
+                    } else {
+                        showState(errorState);
+                        errorTitle.textContent   = code === 404 ? 'لم يتم العثور على الشحنة' : 'حدث خطأ';
+                        errorMessage.textContent = message || 'يرجى التحقق من رقم التتبع والمحاولة مرة أخرى';
+                    }
+
+                } catch (err) {
+                    showState(errorState);
+                    errorTitle.textContent   = 'خطأ في الاتصال';
+                    errorMessage.textContent = err.message || 'تعذر الاتصال بالخادم';
+                }
+            }
+
+            // ── Events ──
+            searchBtn.addEventListener('click', () => {
+                fetchParcel(trackingInput.value);
+            });
+
+            trackingInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') fetchParcel(trackingInput.value);
+            });
+
+            // ── Auto-detect tracking number from URL ──
+            function detectTrackingFromURL() {
+                // 1. Query param ?tracking=XXX or ?t=XXX
+                const params = new URLSearchParams(window.location.search);
+                const q = params.get('tracking') || params.get('t');
+                if (q) {
+                    searchBox.style.display = 'none';
+                    trackingInput.value = q;
+                    fetchParcel(q);
+                    return;
+                }
+
+                // 2. Hash-based: /#/TRACKING
+                const hash = window.location.hash.replace(/^#\/?/, '');
+                if (hash && hash.length > 2) {
+                    searchBox.style.display = 'none';
+                    trackingInput.value = hash;
+                    fetchParcel(hash);
+                    return;
+                }
+
+                // 3. Path-based (if deployed with proper server config):
+                //    Try last path segment if it looks like a tracking code
+                const pathSegs = window.location.pathname.split('/').filter(Boolean);
+                const last = pathSegs[pathSegs.length - 1];
+                if (last && last !== 'index.html' && last.length > 2) {
+                    trackingInput.value = last;
+                    fetchParcel(last);
+                }
+            }
+
+            detectTrackingFromURL();
+
+            window.addEventListener('hashchange', detectTrackingFromURL);
+
+        })();
+    </script>
+
+</body>
+</html>
