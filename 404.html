@@ -717,6 +717,7 @@
                 const pathSegs = window.location.pathname.split('/').filter(Boolean);
                 const last = pathSegs[pathSegs.length - 1];
                 if (last && last !== 'index.html' && last.length > 2) {
+                    searchBox.style.display = 'none';
                     trackingInput.value = last;
                     fetchParcel(last);
                 }
