@@ -421,7 +421,7 @@
     <div class="container">
 
         <!-- Search -->
-        <div class="search-box">
+        <div class="search-box" id="searchBox">
             <label for="trackingInput">رقم التتبع</label>
             <div class="search-row">
                 <input
@@ -519,6 +519,7 @@
             const $ = (id) => document.getElementById(id);
             const trackingInput   = $('trackingInput');
             const searchBtn       = $('searchBtn');
+            const searchBox       = $('searchBox');
             const loadingState    = $('loadingState');
             const errorState      = $('errorState');
             const errorTitle      = $('errorTitle');
@@ -696,6 +697,7 @@
                 const params = new URLSearchParams(window.location.search);
                 const q = params.get('tracking') || params.get('t');
                 if (q) {
+                    searchBox.style.display = 'none';
                     trackingInput.value = q;
                     fetchParcel(q);
                     return;
@@ -704,6 +706,7 @@
                 // 2. Hash-based: /#/TRACKING
                 const hash = window.location.hash.replace(/^#\/?/, '');
                 if (hash && hash.length > 2) {
+                    searchBox.style.display = 'none';
                     trackingInput.value = hash;
                     fetchParcel(hash);
                     return;
